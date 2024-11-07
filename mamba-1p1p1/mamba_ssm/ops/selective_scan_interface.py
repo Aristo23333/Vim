@@ -218,12 +218,10 @@ class MambaInnerFnNoOutProj(torch.autograd.Function):
         if D is not None:
             D = D.contiguous()
             
-
-        mamba_in = rearrange(conv1d_out, "b d l -> b l d")             
+          
         out, scan_intermediates, out_z = selective_scan_cuda.fwd(
             conv1d_out, delta, A, B, C, D, z, delta_bias, delta_softplus
         )
-        out_return = rearrange(out, "b d l -> b l d")
 
         ctx.delta_softplus = delta_softplus
         ctx.checkpoint_lvl = checkpoint_lvl
@@ -233,11 +231,11 @@ class MambaInnerFnNoOutProj(torch.autograd.Function):
                               delta_proj_weight, conv1d_out, delta,
                               A, B, C, D, delta_bias, scan_intermediates, out)
         # return rearrange(out_z, "b d l -> b l d")
-        return out_z,B_return,C_return,delta_return,mamba_in,out_return
+        return out_z,B_return,C_return,delta_return
 
     @staticmethod
     @custom_bwd
-    def backward(ctx, dout, dB_return=None, dC_return=None, ddelta_return=None, dmamba_in=None, dout_return=None):
+    def backward(ctx, dout, dB_return=None, dC_return=None, ddelta_return=None):
 
         # dout: (batch, seqlen, dim)
         (xz, conv1d_weight, conv1d_bias, x_dbl, x_proj_weight, delta_proj_weight, 
