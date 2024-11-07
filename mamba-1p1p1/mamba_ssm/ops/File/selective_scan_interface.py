@@ -162,14 +162,12 @@ class MambaInnerFnNoOutProj(torch.autograd.Function):
         """
              xz: (batch, dim, seqlen)
         """
-        #将输入的变量转为float32
-        
         assert checkpoint_lvl in [0, 1]
         L = xz.shape[-1]
         delta_rank = delta_proj_weight.shape[1]
         d_state = A.shape[-1] * (1 if not A.is_complex() else 2)
         if torch.is_autocast_enabled():
-            x_proj_weight = x_proj_weight.to(dtype=torch.get_autocast_gpu_dtype())#如果开启了混合精度，将权重转为混合精度
+            x_proj_weight = x_proj_weight.to(dtype=torch.get_autocast_gpu_dtype())
             delta_proj_weight = delta_proj_weight.to(dtype=torch.get_autocast_gpu_dtype())
         if xz.stride(-1) != 1:
             xz = xz.contiguous()
@@ -193,7 +191,7 @@ class MambaInnerFnNoOutProj(torch.autograd.Function):
             if B_proj_bias is not None:
                 B = B + B_proj_bias.to(dtype=B.dtype)
             if not A.is_complex():
-                B_return = rearrange(B, "(b l) dstate -> b l dstate", l=L).contiguous()
+                B_return = rearrange(B, "(b l) dstate -> b dstate l", l=L).contiguous()
                 B = rearrange(B, "(b l) dstate -> b 1 dstate l", l=L).contiguous()
             else:
                 B_return = rearrange(B, "(b l) (dstate two) -> b l dstate", l=L, two=2).contiguous()
@@ -217,14 +215,9 @@ class MambaInnerFnNoOutProj(torch.autograd.Function):
                 C = C.contiguous()
         if D is not None:
             D = D.contiguous()
-            
-
-        mamba_in = rearrange(conv1d_out, "b d l -> b l d")             
         out, scan_intermediates, out_z = selective_scan_cuda.fwd(
             conv1d_out, delta, A, B, C, D, z, delta_bias, delta_softplus
         )
-        out_return = rearrange(out, "b d l -> b l d")
-
         ctx.delta_softplus = delta_softplus
         ctx.checkpoint_lvl = checkpoint_lvl
         if checkpoint_lvl >= 1:  # Will recompute conv1d_out and delta in the backward pass
@@ -233,12 +226,11 @@ class MambaInnerFnNoOutProj(torch.autograd.Function):
                               delta_proj_weight, conv1d_out, delta,
                               A, B, C, D, delta_bias, scan_intermediates, out)
         # return rearrange(out_z, "b d l -> b l d")
-        return out_z,B_return,C_return,delta_return,mamba_in,out_return
+        return out_z,B_return,C_return,delta_return
 
     @staticmethod
     @custom_bwd
-    def backward(ctx, dout, dB_return=None, dC_return=None, ddelta_return=None, dmamba_in=None, dout_return=None):
-
+    def backward(ctx, dout, dB_return=None, dC_return=None, ddelta_return=None):
         # dout: (batch, seqlen, dim)
         (xz, conv1d_weight, conv1d_bias, x_dbl, x_proj_weight, delta_proj_weight, 
          conv1d_out, delta, A, B, C, D, delta_bias, scan_intermediates, out) = ctx.saved_tensors

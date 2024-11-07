@@ -30,7 +30,6 @@ try:
 except ImportError:
     RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 
-from mamba_merge import bipartite_soft_matching_ToMe
 
 class Mamba(nn.Module):
     def __init__(
@@ -55,7 +54,6 @@ class Mamba(nn.Module):
         if_divide_out=False,
         init_layer_scale=None,
         if_teacher=True,
-        if_before_meging=True,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -70,7 +68,6 @@ class Mamba(nn.Module):
         self.bimamba_type = bimamba_type
         self.if_divide_out = if_divide_out
         self.if_teacher = if_teacher
-        self.if_before_meging = if_before_meging
 
         self.init_layer_scale = init_layer_scale
         if init_layer_scale is not None:
@@ -218,7 +215,7 @@ class Mamba(nn.Module):
                 )    
             elif self.bimamba_type == "v2":
                 A_b = -torch.exp(self.A_b_log.float())
-                out,B,C,delta,mamba_in,mamba_out = mamba_inner_fn_no_out_proj(
+                out,B,C,delta = mamba_inner_fn_no_out_proj(
                     xz,
                     self.conv1d.weight,
                     self.conv1d.bias,
@@ -231,7 +228,7 @@ class Mamba(nn.Module):
                     delta_bias=self.dt_proj.bias.float(),
                     delta_softplus=True,
                 )
-                out_b,B_b,C_b,delta_b,mamba_in_b,mamba_out_b = mamba_inner_fn_no_out_proj(
+                out_b,B_b,C_b,delta_b = mamba_inner_fn_no_out_proj(
                     xz.flip([-1]),
                     self.conv1d_b.weight,
                     self.conv1d_b.bias,
@@ -244,25 +241,14 @@ class Mamba(nn.Module):
                     delta_bias=self.dt_proj_b.bias.float(),
                     delta_softplus=True,
                 )
-                # if self.if_before_meging:
-                #     out = out + out_b.flip([-1])
-                #     B = B + B_b.flip([-1])
-                #     C = C + C_b.flip([-1])
-                #     delta = delta + delta_b.flip([-1])
-                    
-            
+                # F.linear(rearrange(out_z, "b d l -> b l d"), out_proj_weight, out_proj_bias)
                 if not self.if_divide_out:
                     out = F.linear(rearrange(out + out_b.flip([-1]), "b d l -> b l d"), self.out_proj.weight, self.out_proj.bias)
                     B = B + B_b.flip([-1])
                     C = C + C_b.flip([-1])
                     delta = delta + delta_b.flip([-1])
                 else:
-                    mamba_out = rearrange(out + out_b.flip([-1]), "b d l -> b l d")/2
                     out = F.linear(rearrange(out + out_b.flip([-1]), "b d l -> b l d") / 2, self.out_proj.weight, self.out_proj.bias)
-                    #检查out_proj.weight是否满秩
-                    # rank = torch.linalg.matrix_rank(self.out_proj.weight)
-                    # if rank < self.d_model:
-                        # print("out_proj.weight is not full rank")
                     B = B + B_b.flip([-1])
                     C = C + C_b.flip([-1])
                     delta = delta + delta_b.flip([-1])
@@ -334,7 +320,7 @@ class Mamba(nn.Module):
         if not self.if_teacher:
             return out,B,C,delta
         else:
-            return out,mamba_in,mamba_out
+            return out
 
     def step(self, hidden_states, conv_state, ssm_state):
         dtype = hidden_states.dtype

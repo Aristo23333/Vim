@@ -1,0 +1,30 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python 调试程序: 包含参数的当前文件",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--model", "vim_tiny_patch16_stride8_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2",
+                "--batch-size", "16",
+                "--lr", "5e-6",
+                "--min-lr", "1e-5",
+                "--warmup-lr", "1e-5",
+                "--drop-path", "0.0",
+                "--weight-decay", "1e-8",
+                "--num_workers", "25",
+                "--data-path", "/data/personal/nus-zwb/ImageNet",
+                "--output_dir", "./output/vim_tiny_patch16_stride8_224_bimambav2_final_pool_mean_abs_pos_embed_with_midclstok_div2",
+                "--epochs", "30",
+                "--no_amp"
+            ]
+        }
+    ]
+}
+
