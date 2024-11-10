@@ -30,7 +30,7 @@ try:
 except ImportError:
     RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 
-from mamba_merge import bipartite_soft_matching_ToMe
+from .mamba_merge import bipartite_soft_matching_ToMe
 
 class Mamba(nn.Module):
     def __init__(
@@ -334,7 +334,7 @@ class Mamba(nn.Module):
         if not self.if_teacher:
             return out,B,C,delta
         else:
-            return out,mamba_in,mamba_out
+            return out
 
     def step(self, hidden_states, conv_state, ssm_state):
         dtype = hidden_states.dtype
